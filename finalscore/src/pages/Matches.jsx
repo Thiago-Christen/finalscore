@@ -1,76 +1,61 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import MatchCard from '../components/MatchCard';
-import { addMatch, deleteMatch, listMatches, updateMatch } from '../services/matchService';
-import { listChampionships } from '../services/championshipService';
-import { listTeams } from '../services/teamService';
+import { addMatch, deleteMatch, updateMatch } from '../services/matchService';
+import useChampionships from '../hooks/useChampionship';
+import useTeams from '../hooks/useTeam';
+import useMatches from '../hooks/useMatches';
+import useForm from '../hooks/useForm';
 
 export default function Matches() {
-  const [championships, setChampionships] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [matches, setMatches] = useState([]);
   const [championshipFilter, setChampionshipFilter] = useState('all');
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    campeonato_id: '',
-    rodada: 1,
-    local: '',
-    time_mandante_id: '',
-    time_visitante_id: '',
-    gols_mandante: 0,
-    gols_visitante: 0,
-    status: 'agendada',
-    data_partida: new Date().toISOString().slice(0, 10),
-  });
+  const {form,setForm,handleChange,reset} = useForm({campeonato_id: '',rodada: 1,local: '',time_mandante_id: '',time_visitante_id: '',gols_mandante: 0,gols_visitante: 0,status: 'agendada',data_partida: new Date().toISOString().slice(0, 10),});
+  const {
+  championships,
+  error: championshipsError
+} = useChampionships();
+const {
+  teams,
+  error: teamsError
+} = useTeams(championshipFilter);
+  const {
+  matches,
+  loading,
+  error,
+  reload
+} = useMatches(championshipFilter);
 
   useEffect(() => {
-    async function init() {
-      try {
-        const data = await listChampionships();
-        setChampionships(data);
-        if (data.length > 0) {
-          const defaultId = championshipFilter === 'all' ? String(data[0].id) : championshipFilter;
-          setChampionshipFilter(defaultId);
-          setForm((current) => ({ ...current, campeonato_id: defaultId }));
-        }
-      } catch (err) {
-        setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível carregar os campeonatos.');
-      }
-    }
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (
+    championships.length > 0 &&
+    !form.campeonato_id
+  ) {
+    const defaultId =
+      championshipFilter === 'all'
+        ? String(championships[0].id)
+        : championshipFilter;
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const [teamData, matchData] = await Promise.all([
-          listTeams(championshipFilter),
-          listMatches(championshipFilter),
-        ]);
-        setTeams(teamData);
-        setMatches(matchData);
-      } catch (err) {
-        setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível carregar as partidas.');
-      } finally {
-        setLoading(false);
-      }
-    }
+    setForm((current) => ({
+      ...current,
+      campeonato_id: defaultId,
+    }));
+  }
+}, [
+  championships,
+  championshipFilter,
+  form.campeonato_id,
+  setForm,
+]);
 
-    if (championshipFilter) {
-      load();
-    }
-  }, [championshipFilter]);
-
-  const availableTeams = useMemo(
-    () => teams.filter((team) => String(team.campeonato_id) === String(form.campeonato_id)),
-    [teams, form.campeonato_id],
-  );
+  const availableTeams = teams.filter(
+  (team) =>
+    String(team.campeonato_id) ===
+    String(form.campeonato_id)
+);
 
   function clearForm() {
-    setForm({
+    reset({
       campeonato_id: championshipFilter === 'all' ? String(championships[0]?.id || '') : championshipFilter,
       rodada: 1,
       local: '',
@@ -84,18 +69,19 @@ export default function Matches() {
     setEditing(null);
   }
 
-  async function refreshData(filter = championshipFilter) {
-    const [teamData, matchData] = await Promise.all([
-      listTeams(filter),
-      listMatches(filter),
-    ]);
-    setTeams(teamData);
-    setMatches(matchData);
-  }
-
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage('');
+
+    if (
+        form.time_mandante_id ===
+        form.time_visitante_id
+      ) {
+        setMessage(
+          'O time mandante e visitante não podem ser iguais.'
+        );
+        return;
+      }
 
     try {
       const payload = {
@@ -117,7 +103,7 @@ export default function Matches() {
       }
 
       clearForm();
-      await refreshData(championshipFilter);
+      await reload();
     } catch (err) {
       setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar a partida.');
     }
@@ -127,7 +113,7 @@ export default function Matches() {
     try {
       await deleteMatch(id);
       setMessage('Partida excluída.');
-      await refreshData(championshipFilter);
+      await reload();
     } catch (err) {
       setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir a partida.');
     }
@@ -145,6 +131,10 @@ export default function Matches() {
       gols_visitante: match.gols_visitante,
       status: match.status,
       data_partida: match.data_partida ? String(match.data_partida).slice(0, 10) : new Date().toISOString().slice(0, 10),
+    });
+    window.scrollTo({
+      top: 14,
+      behavior: 'smooth',
     });
   }
 
@@ -180,15 +170,37 @@ export default function Matches() {
           </label>
         </div>
 
-        {message ? <div className="toast" style={{ marginTop: '16px' }}>{message}</div> : null}
+          {(message ||
+            error ||
+            teamsError ||
+            championshipsError) && (
+            <div
+              className="toast"
+              style={{ marginTop: "16px" }}
+            >
+              {message ||
+                error ||
+                teamsError ||
+                championshipsError}
+            </div>
+          )}
 
         <form className="form-card" onSubmit={handleSubmit}>
           <div className="form-grid two-cols">
             <label className="field">
               Campeonato
               <select
+                name="campeonato_id"
                 value={form.campeonato_id}
-                onChange={(event) => setForm((current) => ({ ...current, campeonato_id: event.target.value }))}
+                onChange={(event) => {
+                    handleChange(event);
+
+                    setForm((current) => ({
+                      ...current,
+                      time_mandante_id: '',
+                      time_visitante_id: '',
+                    }));
+                }}
                 required
               >
                 <option value="">Selecione</option>
@@ -201,8 +213,9 @@ export default function Matches() {
             <label className="field">
               Local
               <input
+                name="local"
                 value={form.local}
-                onChange={(event) => setForm((current) => ({ ...current, local: event.target.value }))}
+                onChange={handleChange}
                 placeholder="Arena Central"
                 required
               />
@@ -213,8 +226,16 @@ export default function Matches() {
             <label className="field">
               Mandante
               <select
+                name="time_mandante_id"
                 value={form.time_mandante_id}
-                onChange={(event) => setForm((current) => ({ ...current, time_mandante_id: event.target.value }))}
+                onChange={(event) => {
+                  handleChange(event);
+
+                  setForm((current) => ({
+                    ...current,
+                    time_visitante_id: '',
+                  }));
+                }}
                 required
               >
                 <option value="">Selecione</option>
@@ -227,13 +248,22 @@ export default function Matches() {
             <label className="field">
               Visitante
               <select
+                name="time_visitante_id"
                 value={form.time_visitante_id}
-                onChange={(event) => setForm((current) => ({ ...current, time_visitante_id: event.target.value }))}
+                onChange={handleChange}
                 required
               >
                 <option value="">Selecione</option>
-                {availableTeams.map((team) => (
-                  <option key={team.id} value={team.id}>{team.nome}</option>
+                {availableTeams
+                  .filter(
+                    (team) =>
+                      String(team.id) !==
+                      String(form.time_mandante_id)
+                  )
+                  .map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.nome}
+                    </option>
                 ))}
               </select>
             </label>
@@ -243,8 +273,9 @@ export default function Matches() {
               <input
                 type="number"
                 min="1"
+                name="rodada"
                 value={form.rodada}
-                onChange={(event) => setForm((current) => ({ ...current, rodada: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
 
@@ -252,8 +283,10 @@ export default function Matches() {
               Data
               <input
                 type="date"
+                name="data_partida"
                 value={form.data_partida}
-                onChange={(event) => setForm((current) => ({ ...current, data_partida: event.target.value }))}
+                onChange={handleChange}
+
               />
             </label>
           </div>
@@ -264,8 +297,9 @@ export default function Matches() {
               <input
                 type="number"
                 min="0"
+                name="gols_mandante"
                 value={form.gols_mandante}
-                onChange={(event) => setForm((current) => ({ ...current, gols_mandante: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
 
@@ -274,16 +308,18 @@ export default function Matches() {
               <input
                 type="number"
                 min="0"
+                name="gols_visitante"
                 value={form.gols_visitante}
-                onChange={(event) => setForm((current) => ({ ...current, gols_visitante: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
 
             <label className="field">
               Status
               <select
+                name="status"
                 value={form.status}
-                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                onChange={handleChange}
               >
                 <option value="agendada">agendada</option>
                 <option value="finalizada">finalizada</option>

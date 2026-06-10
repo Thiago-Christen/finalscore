@@ -1,19 +1,57 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect,  useState } from 'react';
 import TeamCard from '../components/TeamCard';
-import { addTeam, deleteTeam, listTeams, updateTeam } from '../services/teamService';
+import { addTeam, deleteTeam, updateTeam } from '../services/teamService';
 import { listChampionships } from '../services/championshipService';
+import useTeams from "../hooks/useTeam";
+import useChampionships from "../hooks/useChampionship";
+import useForm from "../hooks/useForm";
 
 const COLOR_SET = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#A855F7', '#14B8A6'];
 
 export default function Teams() {
-  const [championships, setChampionships] = useState([]);
   const [championshipFilter, setChampionshipFilter] = useState('all');
-  const [teams, setTeams] = useState([]);
+  const {championships,loading: championshipsLoading,error: championshipsError} = useChampionships();
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    campeonato_id: '',
+  const {teams,loading,error,reload: loadTeams} = useTeams(championshipFilter);
+  const {
+  form,
+  setForm,
+  handleChange,
+  reset,
+} = useForm({
+  campeonato_id: '',
+  nome: '',
+  cidade: '',
+  cor: COLOR_SET[0],
+  forca: 80,
+  ataque: 80,
+  defesa: 80,
+  pontos: 0,
+});
+
+  useEffect(() => {
+  if (
+    championships.length > 0 &&
+    !form.campeonato_id
+  ) {
+    setForm((current) => ({
+      ...current,
+      campeonato_id: String(championships[0].id),
+    }));
+
+    if (championshipFilter === "all") {
+      setChampionshipFilter(String(championships[0].id));
+    }
+  }
+}, [championships]);
+
+  function clearForm() {
+  reset({
+    campeonato_id:
+      championshipFilter === 'all'
+        ? String(championships[0]?.id || '')
+        : championshipFilter,
     nome: '',
     cidade: '',
     cor: COLOR_SET[0],
@@ -23,60 +61,8 @@ export default function Teams() {
     pontos: 0,
   });
 
-  async function loadChampionships() {
-    const data = await listChampionships();
-    setChampionships(data);
-    if (!form.campeonato_id && data.length > 0) {
-      setForm((current) => ({ ...current, campeonato_id: String(data[0].id) }));
-      if (championshipFilter === 'all') {
-        setChampionshipFilter(String(data[0].id));
-      }
-    }
-  }
-
-  async function loadTeams(filter = championshipFilter) {
-    setLoading(true);
-    try {
-      const data = await listTeams(filter);
-      setTeams(data);
-    } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível carregar os times.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    async function init() {
-      try {
-        await loadChampionships();
-      } catch (err) {
-        setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível carregar os campeonatos.');
-      }
-    }
-    init();
-  }, []);
-
-  useEffect(() => {
-    loadTeams(championshipFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [championshipFilter]);
-
-  const filteredChampionships = useMemo(() => championships, [championships]);
-
-  function clearForm() {
-    setForm({
-      campeonato_id: championshipFilter === 'all' ? String(championships[0]?.id || '') : championshipFilter,
-      nome: '',
-      cidade: '',
-      cor: COLOR_SET[0],
-      forca: 80,
-      ataque: 80,
-      defesa: 80,
-      pontos: 0,
-    });
-    setEditing(null);
-  }
+  setEditing(null);
+}
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -129,6 +115,11 @@ export default function Teams() {
       defesa: team.defesa,
       pontos: team.pontos,
     });
+
+    window.scrollTo({
+      top: 14,
+      behavior: 'smooth',
+    });
   }
 
   return (
@@ -142,9 +133,11 @@ export default function Teams() {
 
           <label className="field" style={{ minWidth: '240px' }}>
             Campeonato
-            <select value={championshipFilter} onChange={(event) => setChampionshipFilter(event.target.value)}>
+            <select name="campeonato_id" value={championshipFilter}
+              onChange={(e) => setChampionshipFilter(e.target.value)}
+            >
               <option value="all">Todos os campeonatos</option>
-              {filteredChampionships.map((championship) => (
+              {championships.map((championship) => (
                 <option key={championship.id} value={championship.id}>
                   {championship.nome}
                 </option>
@@ -153,6 +146,11 @@ export default function Teams() {
           </label>
         </div>
 
+        {error && (
+          <div className="toast" style={{ marginTop: '16px' }}>
+            {error}
+          </div>
+        )}
         {message ? <div className="toast" style={{ marginTop: '16px' }}>{message}</div> : null}
 
         <form className="form-card" onSubmit={handleSubmit}>
@@ -160,8 +158,9 @@ export default function Teams() {
             <label className="field">
               Campeonato
               <select
+                name="campeonato_id"
                 value={form.campeonato_id}
-                onChange={(event) => setForm((current) => ({ ...current, campeonato_id: event.target.value }))}
+                onChange={handleChange}
                 required
               >
                 <option value="">Selecione</option>
@@ -174,8 +173,9 @@ export default function Teams() {
             <label className="field">
               Nome
               <input
+                name="nome"
                 value={form.nome}
-                onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))}
+                onChange={handleChange}
                 required
               />
             </label>
@@ -185,8 +185,9 @@ export default function Teams() {
             <label className="field">
               Cidade
               <input
+                name="cidade"
                 value={form.cidade}
-                onChange={(event) => setForm((current) => ({ ...current, cidade: event.target.value }))}
+                onChange={handleChange}
                 required
               />
             </label>
@@ -196,8 +197,9 @@ export default function Teams() {
                 type="number"
                 min="0"
                 max="100"
-                value={form.forca}
-                onChange={(event) => setForm((current) => ({ ...current, forca: event.target.value }))}
+                name="ataque"
+                value={form.ataque}
+                onChange={handleChange}
               />
             </label>
             <label className="field">
@@ -206,8 +208,9 @@ export default function Teams() {
                 type="number"
                 min="0"
                 max="100"
+                name="ataque"
                 value={form.ataque}
-                onChange={(event) => setForm((current) => ({ ...current, ataque: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
           </div>
@@ -219,8 +222,9 @@ export default function Teams() {
                 type="number"
                 min="0"
                 max="100"
+                name="defesa"
                 value={form.defesa}
-                onChange={(event) => setForm((current) => ({ ...current, defesa: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
 
@@ -229,8 +233,9 @@ export default function Teams() {
               <input
                 type="number"
                 min="0"
+                name="pontos"
                 value={form.pontos}
-                onChange={(event) => setForm((current) => ({ ...current, pontos: event.target.value }))}
+                onChange={handleChange}
               />
             </label>
 

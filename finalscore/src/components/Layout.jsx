@@ -14,7 +14,6 @@ export default function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <span className="eyebrow">JWT • MySQL • Mockaroo</span>
           <h1>FinalScore</h1>
           <p className="subtitle">
             {user?.nome ? `Bem-vindo, ${user.nome}` : 'Gerenciamento de campeonatos, times e partidas'}
@@ -39,7 +38,7 @@ export default function Layout() {
 
       <footer className="footer">
         <span>FinalScore</span>
-        <span>Os dados são persistidos diretamente no MySQL.</span>
+        <span>2026</span>
       </footer>
     </div>
   );

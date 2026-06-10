@@ -10,6 +10,7 @@ import Championships from './pages/Championships';
 import Teams from './pages/Teams';
 import Matches from './pages/Matches';
 import Project from './pages/Project';
+import LoadingRedirect from './pages/LoadingRedirect';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/choose" element={<ChoosePage />} />
+        <Route path="/redirect" element={<LoadingRedirect />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/campeonatos" element={<Championships />} />

@@ -5,10 +5,10 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const pool = require('./db');
-const { generateSeedBundle } = require('./mockaroo');
+const { generateSeedBundle } = require('./TheSports');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'finalscore-secret';
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 10);
 
@@ -162,6 +162,7 @@ const SCHEMA_STATEMENTS = [
     campeonato_id INT NOT NULL,
     nome VARCHAR(100) NOT NULL,
     cidade VARCHAR(100) NOT NULL,
+    estadio VARCHAR(150) NOT NULL,
     cor VARCHAR(50) NOT NULL,
     forca INT DEFAULT 0,
     ataque INT DEFAULT 0,
@@ -227,7 +228,7 @@ async function ensureDemoData() {
 
   const [championshipResult] = await pool.query(
     'INSERT INTO campeonato (usuario_id, nome, descricao) VALUES (?, ?, ?)',
-    [userId, 'Campeonato Demo', 'Seed inicial gerado automaticamente via Mockaroo'],
+    [userId, 'Campeonato Demo', 'Seed inicial gerado automaticamente'],
   );
 
   await seedChampionship(championshipResult.insertId, userId);
@@ -350,6 +351,24 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
 
   if (!nome || !email || !senha) {
     return res.status(400).json({ mensagem: 'Preencha nome, email e senha.' });
+  }
+
+  if (nome.trim().length < 3) {
+  return res.status(400).json({
+    mensagem: 'O nome deve possuir pelo menos 3 caracteres.'
+  });
+  }
+
+  if (!email.includes('@')) {
+    return res.status(400).json({
+      mensagem: 'Email inválido.'
+    });
+  }
+
+  if (String(senha).length < 6) {
+    return res.status(400).json({
+      mensagem: 'A senha deve possuir pelo menos 6 caracteres.'
+    });
   }
 
   const [existing] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
@@ -663,6 +682,12 @@ app.post('/api/matches', authRequired, asyncHandler(async (req, res) => {
   const homeId = normalizeId(time_mandante_id);
   const awayId = normalizeId(time_visitante_id);
 
+  if (homeId === awayId) {
+  return res.status(400).json({
+    mensagem: 'O time mandante e visitante não podem ser iguais.'
+  });
+}
+
   if (!championshipId || !homeId || !awayId || !rodada || !local) {
     return res.status(400).json({ mensagem: 'Preencha os campos obrigatórios da partida.' });
   }
@@ -746,6 +771,12 @@ app.put('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
   const championshipId = normalizeId(campeonato_id);
   const homeId = normalizeId(time_mandante_id);
   const awayId = normalizeId(time_visitante_id);
+
+  if (homeId === awayId) {
+  return res.status(400).json({
+    mensagem: 'O time mandante e visitante não podem ser iguais.'
+  });
+}
 
   if (!championshipId || !homeId || !awayId) {
     return res.status(400).json({ mensagem: 'Campos inválidos.' });
@@ -831,19 +862,23 @@ async function seedChampionship(championshipId, userId) {
   const teamIds = [];
   for (const team of generated.times) {
     const [result] = await pool.query(
-      `INSERT INTO times (campeonato_id, nome, cidade, cor, forca, ataque, defesa, pontos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [championshipId, team.nome, team.cidade, team.cor, team.forca, team.ataque, team.defesa, team.points || 0],
+      `INSERT INTO times (campeonato_id, nome, cidade, estadio ,cor, forca, ataque, defesa, pontos)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [championshipId, team.nome, team.cidade, team.estadio ,team.cor, team.forca, team.ataque, team.defesa, team.points || 0],
     );
     teamIds.push(result.insertId);
   }
 
   const createdMatches = [];
   for (const match of generated.partidas) {
-    const homeId = teamIds[match.time_mandante_index - 1] || teamIds[0];
-    const awayId = teamIds[match.time_visitante_index - 1] || teamIds[1] || teamIds[0];
+    const homeId =teamIds[match.time_mandante_index]|| teamIds[0];
+    const awayId =teamIds[match.time_visitante_index]|| teamIds[1]|| teamIds[0];
     const finalizada = match.status === 'finalizada';
     const resultado = finalizada ? buildResult(match.gols_mandante, match.gols_visitante) : 'A definir';
+
+    if (homeId === awayId) {
+      continue;
+    }
 
     const [result] = await pool.query(
       `INSERT INTO partidas
@@ -896,8 +931,14 @@ async function seedChampionship(championshipId, userId) {
 }
 
 app.use((err, _req, res, _next) => {
+  console.error('ERRO COMPLETO:');
   console.error(err);
-  res.status(500).json({ mensagem: 'Erro interno do servidor.' });
+
+  res.status(500).json({
+    mensagem: 'Erro interno do servidor.',
+    erro: err.message,
+    stack: err.stack,
+  });
 });
 
 async function startServer() {

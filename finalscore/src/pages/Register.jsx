@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../services/authService';
+import Alert from '../components/Alert';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -15,6 +16,27 @@ export default function Register() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+
+    if(!form.nome.trim()) {
+      setError('Informe seu nome');
+      return;
+    }
+
+    if (!form.email.trim()) {
+        setError('Informe o e-mail.');
+        return;
+        }
+    
+    if (!form.senha.trim()) {
+      setError('Informe a senha.');
+      return;
+    }
+    
+    if (form.senha.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -32,9 +54,7 @@ export default function Register() {
       <div className="auth-copy panel">
         <span className="badge accent">Cadastro do usuário</span>
         <h1>Crie sua conta para acessar os campeonatos.</h1>
-        <p>
-          O cadastro grava o usuário no banco. Depois do login você escolhe entre criar um campeonato vazio ou gerar times e partidas com Mockaroo.
-        </p>
+        <p>Seja bem-vindo ao FinalScore!!</p>
       </div>
 
       <form className="auth-card panel" onSubmit={handleSubmit}>
@@ -47,7 +67,6 @@ export default function Register() {
             value={form.nome}
             onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))}
             placeholder="Seu nome"
-            required
           />
         </label>
 
@@ -58,7 +77,6 @@ export default function Register() {
             value={form.email}
             onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
             placeholder="voce@exemplo.com"
-            required
           />
         </label>
 
@@ -69,11 +87,10 @@ export default function Register() {
             value={form.senha}
             onChange={(event) => setForm((current) => ({ ...current, senha: event.target.value }))}
             placeholder="Crie sua senha"
-            required
           />
         </label>
 
-        {error ? <div className="toast error">{error}</div> : null}
+        <Alert type="error">{error}</Alert>
 
         <button className="button primary" type="submit" disabled={loading}>
           {loading ? 'Criando...' : 'Criar conta'}

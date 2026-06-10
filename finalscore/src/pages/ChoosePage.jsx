@@ -1,8 +1,28 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { listChampionships } from "../services/championshipService";
 import './ChoosePage.css';
 
 export default function ChoosePage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+  async function verify() {
+    try {
+      const championships = await listChampionships();
+
+      console.log("RETORNO:", championships);
+
+      if (championships.length > 0) {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error("ERRO:", error);
+    }
+  }
+
+  verify();
+}, [navigate]);
 
   function handlePopular() {
     navigate('/campeonatos?seed=1');

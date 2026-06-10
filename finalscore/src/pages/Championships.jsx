@@ -1,46 +1,33 @@
 import { useEffect, useState } from 'react';
+import useChampionships from '../hooks/useChampionship';
 import { useSearchParams } from 'react-router-dom';
-import { addChampionship, deleteChampionship, generateSeedForChampionship, listChampionships, updateChampionship } from '../services/championshipService';
+import { addChampionship, deleteChampionship, generateSeedForChampionship, updateChampionship } from '../services/championshipService';
+import useForm from "../hooks/useForm";
 
 export default function Championships() {
   const [searchParams, setSearchParams] = useSearchParams();
   const seedFromQuery = searchParams.get('seed') === '1';
-
-  const [form, setForm] = useState({
-    nome: '',
-    descricao: '',
-    generateSeed: seedFromQuery,
-  });
-  const [championships, setChampionships] = useState([]);
+  const {form,setForm,handleChange,reset} = useForm({nome: '',descricao: '',generateSeed: seedFromQuery,});
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  async function loadChampionships() {
-    setLoading(true);
-    try {
-      const data = await listChampionships();
-      setChampionships(data);
-    } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível carregar os campeonatos.');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const {championships,loading,error,reload: loadChampionships} = useChampionships();
 
   useEffect(() => {
     setForm((current) => ({ ...current, generateSeed: seedFromQuery }));
   }, [seedFromQuery]);
 
-  useEffect(() => {
-    loadChampionships();
-  }, []);
 
   function clearForm() {
-    setForm({ nome: '', descricao: '', generateSeed: seedFromQuery });
-    setEditing(null);
-  }
+  reset({
+    nome: '',
+    descricao: '',
+    generateSeed: seedFromQuery,
+  });
+
+  setEditing(null);
+}
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -68,7 +55,7 @@ export default function Championships() {
         }
 
         if (created?.gerado) {
-          setMessage('Campeonato criado e persistido com seed via Mockaroo.');
+          setMessage('Campeonato criado.');
         }
       }
 
@@ -114,18 +101,20 @@ export default function Championships() {
   return (
     <section className="page-grid">
       {message ? <div className="toast">{message}</div> : null}
+      {error ? <div className="toast">{error}</div> : null}
 
       <div className="panel">
         <h2>{editing ? 'Editar campeonato' : 'Criar campeonato'}</h2>
-        <p>O botão de seed gera o JSON aleatório no backend e grava times e partidas diretamente no MySQL.</p>
+        <p>O botão de seed gera aleatóriamente times e partidas e grava diretamente no banco de dados.</p>
 
         <form className="form-card" onSubmit={handleSubmit}>
           <div className="form-grid two-cols">
             <label className="field">
               Nome
               <input
+                name="nome"
                 value={form.nome}
-                onChange={(event) => setForm((current) => ({ ...current, nome: event.target.value }))}
+                onChange={handleChange}
                 placeholder="Ex.: FinalScore Cup 2026"
                 required
               />
@@ -133,8 +122,9 @@ export default function Championships() {
             <label className="field">
               Descrição
               <input
+                name="descricao"
                 value={form.descricao}
-                onChange={(event) => setForm((current) => ({ ...current, descricao: event.target.value }))}
+                onChange={handleChange}
                 placeholder="Ex.: Temporada principal"
                 required
               />
@@ -144,10 +134,11 @@ export default function Championships() {
           <label className="field checkbox-field">
             <input
               type="checkbox"
+              name="generateSeed"
               checked={form.generateSeed}
-              onChange={(event) => setForm((current) => ({ ...current, generateSeed: event.target.checked }))}
+              onChange={handleChange}
             />
-            Gerar times e partidas automaticamente via Mockaroo
+            Gerar times e partidas automaticamente.
           </label>
 
           <div className="inline-actions">

@@ -1,21 +1,38 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/authService';
+import Alert from "../components/Alert";
 
 export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', senha: '' });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+
+    if (!form.email.trim()) {
+        setError('Informe o e-mail.');
+        return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(form.email)) {
+        setError('Digite um e-mail válido.');
+        return;
+    }
+    
+    if (!form.senha.trim()) {
+      setError('Informe a senha.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       await loginUser(form.email, form.senha);
-      navigate('/choose');
+      navigate('/redirect');
     } catch (err) {
       setError(err?.response?.data?.mensagem || err.message || 'Não foi possível entrar.');
     } finally {
@@ -26,11 +43,9 @@ export default function Login() {
   return (
     <section className="auth-grid">
       <div className="auth-copy panel">
-        <span className="badge accent">Acesso ao projeto</span>
+        <span className="badge accent">Login</span>
         <h1>Entre para continuar no FinalScore.</h1>
-        <p>
-          Os dados do usuário, campeonatos, times e partidas ficam no MySQL. O JWT libera o acesso à área protegida.
-        </p>
+        <p>Caso você não tenha cadastro, crie uma nova conta abaixo.</p>
         <Link to="/cadastro" className="button primary">Criar conta</Link>
       </div>
 
@@ -45,7 +60,6 @@ export default function Login() {
             value={form.email}
             onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
             placeholder="voce@exemplo.com"
-            required
           />
         </label>
 
@@ -56,19 +70,14 @@ export default function Login() {
             value={form.senha}
             onChange={(event) => setForm((current) => ({ ...current, senha: event.target.value }))}
             placeholder="Sua senha"
-            required
           />
         </label>
 
-        {error ? <div className="toast error">{error}</div> : null}
+        <Alert type="error">{error}</Alert>
 
         <button className="button primary" type="submit" disabled={loading}>
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
-
-        <p className="auth-footer">
-          Não tem cadastro? <Link to="/cadastro">Criar conta</Link>
-        </p>
       </form>
     </section>
   );
