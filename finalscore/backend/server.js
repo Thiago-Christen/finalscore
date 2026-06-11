@@ -545,6 +545,7 @@ app.post('/api/teams', authRequired, asyncHandler(async (req, res) => {
     campeonato_id,
     nome,
     cidade,
+    estadio,
     cor,
     forca = 0,
     ataque = 0,
@@ -563,9 +564,10 @@ app.post('/api/teams', authRequired, asyncHandler(async (req, res) => {
   }
 
   const [result] = await pool.query(
-    `INSERT INTO times (campeonato_id, nome, cidade, cor, forca, ataque, defesa, pontos)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [championshipId, nome.trim(), cidade.trim(), cor, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0, Number(pontos) || 0],
+    `INSERT INTO times (campeonato_id, nome, cidade, estadio ,cor, forca, ataque, defesa, pontos)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [championshipId, nome.trim(), cidade.trim(), estadio?.trim() || '',cor, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0, Number(pontos) || 0],
+    
   );
 
   res.status(201).json({
@@ -587,6 +589,7 @@ app.put('/api/teams/:id', authRequired, asyncHandler(async (req, res) => {
     campeonato_id,
     nome,
     cidade,
+    estadio,
     cor,
     forca = 0,
     ataque = 0,
@@ -615,7 +618,7 @@ app.put('/api/teams/:id', authRequired, asyncHandler(async (req, res) => {
 
   await pool.query(
     `UPDATE times
-        SET campeonato_id = ?, nome = ?, cidade = ?, cor = ?, forca = ?, ataque = ?, defesa = ?, pontos = ?
+        SET campeonato_id = ?, nome = ?, cidade = ?, estadio = ? ,cor = ?, forca = ?, ataque = ?, defesa = ?, pontos = ?
       WHERE id = ?`,
     [championshipId, nome.trim(), cidade.trim(), cor, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0, Number(pontos) || 0, teamId],
   );

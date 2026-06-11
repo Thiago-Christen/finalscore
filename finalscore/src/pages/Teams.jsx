@@ -23,6 +23,7 @@ export default function Teams() {
   campeonato_id: '',
   nome: '',
   cidade: '',
+  estadio:'',
   cor: COLOR_SET[0],
   forca: 80,
   ataque: 80,
@@ -54,6 +55,7 @@ export default function Teams() {
         : championshipFilter,
     nome: '',
     cidade: '',
+    estadio:'',
     cor: COLOR_SET[0],
     forca: 80,
     ataque: 80,
@@ -66,6 +68,9 @@ export default function Teams() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    console.log("FORM ENVIADO:", form);
+
     setMessage('');
 
     try {
@@ -109,6 +114,7 @@ export default function Teams() {
       campeonato_id: String(team.campeonato_id),
       nome: team.nome,
       cidade: team.cidade,
+      estadio: team.estadio,
       cor: team.cor,
       forca: team.forca,
       ataque: team.ataque,
@@ -181,7 +187,7 @@ export default function Teams() {
             </label>
           </div>
 
-          <div className="form-grid three-cols">
+          <div className="form-grid four-cols">
             <label className="field">
               Cidade
               <input
@@ -192,13 +198,22 @@ export default function Teams() {
               />
             </label>
             <label className="field">
+              Estádio
+              <input
+                name="estadio"
+                value={form.estadio}
+                onChange={handleChange}
+                required
+              />
+            </label>
+            <label className="field">
               Força
               <input
                 type="number"
                 min="0"
                 max="100"
-                name="ataque"
-                value={form.ataque}
+                name="forca"
+                value={form.forca}
                 onChange={handleChange}
               />
             </label>
