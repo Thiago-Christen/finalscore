@@ -7,7 +7,16 @@ export async function listTeams(championshipId = 'all') {
 }
 
 export async function addTeam(payload) {
-  const { data } = await api.post('/teams', payload);
+  const { data } = await api.post(
+    '/teams',
+    payload,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+
   return data;
 }
 

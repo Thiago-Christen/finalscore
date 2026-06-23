@@ -5,11 +5,12 @@ import useChampionships from '../hooks/useChampionship';
 import useTeams from '../hooks/useTeam';
 import useMatches from '../hooks/useMatches';
 import useForm from '../hooks/useForm';
+import Alert from '../components/Alert';
+import useMessageAndEditing from '../hooks/useMessageAndEditting';
 
 export default function Matches() {
   const [championshipFilter, setChampionshipFilter] = useState('all');
-  const [editing, setEditing] = useState(null);
-  const [message, setMessage] = useState('');
+  const {message,showMessage,editing,setEditing,stopEditing} = useMessageAndEditing();
   const {form,setForm,handleChange,reset} = useForm({campeonato_id: '',rodada: 1,local: '',time_mandante_id: '',time_visitante_id: '',gols_mandante: 0,gols_visitante: 0,status: 'agendada',data_partida: new Date().toISOString().slice(0, 10),});
   const {
   championships,
@@ -66,18 +67,18 @@ const {
       status: 'agendada',
       data_partida: new Date().toISOString().slice(0, 10),
     });
-    setEditing(null);
+    stopEditing();
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setMessage('');
+    showMessage('');
 
     if (
         form.time_mandante_id ===
         form.time_visitante_id
       ) {
-        setMessage(
+        showMessage(
           'O time mandante e visitante não podem ser iguais.'
         );
         return;
@@ -96,26 +97,26 @@ const {
 
       if (editing) {
         await updateMatch(editing.id, payload);
-        setMessage('Partida atualizada com sucesso.');
+        showMessage('Partida atualizada com sucesso.');
       } else {
         await addMatch(payload);
-        setMessage('Partida criada com sucesso.');
+        showMessage('Partida criada com sucesso.');
       }
 
       clearForm();
       await reload();
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar a partida.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar a partida.');
     }
   }
 
   async function handleRemove(id) {
     try {
       await deleteMatch(id);
-      setMessage('Partida excluída.');
+      showMessage('Partida excluída.');
       await reload();
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir a partida.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir a partida.');
     }
   }
 
@@ -170,18 +171,9 @@ const {
           </label>
         </div>
 
-          {(message ||
-            error ||
-            teamsError ||
-            championshipsError) && (
-            <div
-              className="toast"
-              style={{ marginTop: "16px" }}
-            >
-              {message ||
-                error ||
-                teamsError ||
-                championshipsError}
+          {(message || error || teamsError || championshipsError) && (
+            <div className="toast" style={{ marginTop: "16px" }}>
+              {error || teamsError || championshipsError || message}
             </div>
           )}
 
@@ -201,7 +193,7 @@ const {
                       time_visitante_id: '',
                     }));
                 }}
-                required
+                
               >
                 <option value="">Selecione</option>
                 {championships.map((championship) => (
@@ -217,7 +209,7 @@ const {
                 value={form.local}
                 onChange={handleChange}
                 placeholder="Arena Central"
-                required
+                
               />
             </label>
           </div>
@@ -236,7 +228,7 @@ const {
                     time_visitante_id: '',
                   }));
                 }}
-                required
+                
               >
                 <option value="">Selecione</option>
                 {availableTeams.map((team) => (
@@ -251,7 +243,7 @@ const {
                 name="time_visitante_id"
                 value={form.time_visitante_id}
                 onChange={handleChange}
-                required
+                
               >
                 <option value="">Selecione</option>
                 {availableTeams

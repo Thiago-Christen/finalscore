@@ -37,16 +37,7 @@ async function generateTeamsFromSportsDB(teamCount) {
     nome: team.strTeam,
     cidade: team.strLocation || team.strCountry || 'Desconhecida',
     estadio: team.strStadium || 'Estádio Aleatório',
-    cor: [
-      '#22C55E',
-      '#3B82F6',
-      '#F59E0B',
-      '#EF4444',
-      '#A855F7',
-      '#14B8A6',
-      '#F97316',
-      '#0EA5E9',
-    ][Math.floor(Math.random() * 8)],
+    escudo: team.strBadge,
     forca: Math.floor(Math.random() * 30) + 70,
     ataque: Math.floor(Math.random() * 35) + 65,
     defesa: Math.floor(Math.random() * 35) + 65,
@@ -55,78 +46,74 @@ async function generateTeamsFromSportsDB(teamCount) {
 
 function fallbackTeams() {
   return [
-    {
-      nome: 'Aurora FC',
-      cidade: 'Curitiba',
-      estadio: 'Arena Aurora',
-      cor: '#22C55E',
-      forca: 92,
-      ataque: 94,
-      defesa: 88,
-    },
-    {
-      nome: 'Nexus United',
-      cidade: 'São Paulo',
-      estadio: 'Arena Nexus',
-      cor: '#3B82F6',
-      forca: 86,
-      ataque: 83,
-      defesa: 84,
-    },
-    {
-      nome: 'Vortex Club',
-      cidade: 'Rio de Janeiro',
-      estadio: 'Arena Vortex',
-      cor: '#F59E0B',
-      forca: 90,
-      ataque: 85,
-      defesa: 89,
-    },
-    {
-      nome: 'Atlas City',
-      cidade: 'Belo Horizonte',
-      estadio: 'Arena Atlas',
-      cor: '#EF4444',
-      forca: 81,
-      ataque: 78,
-      defesa: 80,
-    },
+    { nome: 'Aurora FC', cidade: 'Curitiba', estadio: 'Arena Aurora', escudo: null, forca: 92, ataque: 94, defesa: 88 },
+    { nome: 'Nexus United', cidade: 'São Paulo', estadio: 'Arena Nexus', escudo: null, forca: 86, ataque: 83, defesa: 84 },
+    { nome: 'Vortex Club', cidade: 'Rio de Janeiro', estadio: 'Arena Vortex', escudo: null, forca: 90, ataque: 85, defesa: 89 },
+    { nome: 'Atlas City', cidade: 'Belo Horizonte', estadio: 'Arena Atlas', escudo: null, forca: 81, ataque: 78, defesa: 80 },
+
+    { nome: 'Titanes FC', cidade: 'Porto Alegre', estadio: 'Estádio Titan', escudo: null, forca: 85, ataque: 82, defesa: 86 },
+    { nome: 'Lobo Azul', cidade: 'Florianópolis', estadio: 'Arena Lobo Azul', escudo: null, forca: 79, ataque: 80, defesa: 77 },
+    { nome: 'Fênix FC', cidade: 'Brasília', estadio: 'Arena Fênix', escudo: null, forca: 88, ataque: 90, defesa: 84 },
+    { nome: 'Storm Riders', cidade: 'Recife', estadio: 'Storm Arena', escudo: null, forca: 83, ataque: 81, defesa: 82 },
+    { nome: 'Cobra Real', cidade: 'Fortaleza', estadio: 'Arena Cobra', escudo: null, forca: 87, ataque: 88, defesa: 85 },
+    { nome: 'Gladiators SC', cidade: 'Salvador', estadio: 'Coliseu SC', escudo: null, forca: 84, ataque: 86, defesa: 83 },
   ];
 }
 
 function fallbackMatches() {
   return [
-    { rodada: 1, local: 'Arena Central', gols_mandante: 2, gols_visitante: 1, status: 'finalizada', data_partida: '2026-05-20' },
-    { rodada: 1, local: 'Arena Norte', gols_mandante: 1, gols_visitante: 1, status: 'finalizada', data_partida: '2026-05-20' },
-    { rodada: 2, local: 'Estádio Municipal', gols_mandante: 0, gols_visitante: 0, status: 'agendada', data_partida: '2026-05-24' },
-    { rodada: 2, local: 'Complexo Esportivo', gols_mandante: 0, gols_visitante: 0, status: 'agendada', data_partida: '2026-05-24' },
-    { rodada: 3, local: 'Arena Sul', gols_mandante: 0, gols_visitante: 0, status: 'agendada', data_partida: '2026-05-28' },
-    { rodada: 3, local: 'Arena Central', gols_mandante: 0, gols_visitante: 0, status: 'agendada', data_partida: '2026-05-28' },
+    ...Array.from({ length: 8 }).map((_, i) => {
+      const data = new Date();
+      data.setDate(data.getDate() - (8 - i)); // jogos passados
+
+      return {
+        rodada: Math.floor(i / 2) + 1,
+        local: `Arena Central ${i + 1}`,
+        gols_mandante: Math.floor(Math.random() * 5),
+        gols_visitante: Math.floor(Math.random() * 5),
+        status: 'finalizada',
+        data_partida: data.toISOString().split('T')[0],
+      };
+    }),
+
+    ...Array.from({ length: 7 }).map((_, i) => {
+      const data = new Date();
+      data.setDate(data.getDate() + i + 1); // jogos futuros
+
+      return {
+        rodada: Math.floor((i + 8) / 2) + 1,
+        local: `Arena Agendada ${i + 1}`,
+        gols_mandante: 0,
+        gols_visitante: 0,
+        status: 'agendada',
+        data_partida: data.toISOString().split('T')[0],
+      };
+    }),
   ];
 }
 
 function generateRandomMatches() {
   const matches = [];
 
-  for (let rodada = 1; rodada <= 3; rodada++) {
-    for (let i = 0; i < 2; i++) {
-      const finalizada = rodada === 1;
+  const totalMatches = 15;
+  const finishedMatches = 8;
 
-      const data = new Date();
-      data.setDate(data.getDate() + (rodada - 1) * 7);
+  for (let i = 0; i < totalMatches; i++) {
+    const finalizada = i < finishedMatches;
 
-      matches.push({
-        rodada,
-        gols_mandante: finalizada
-          ? Math.floor(Math.random() * 5)
-          : 0,
-        gols_visitante: finalizada
-          ? Math.floor(Math.random() * 5)
-          : 0,
-        status: finalizada ? 'finalizada' : 'agendada',
-        data_partida: data.toISOString().split('T')[0],
-      });
-    }
+    const rodada = Math.floor(i / 3) + 1;
+
+    const data = new Date();
+    data.setDate(data.getDate() + i * 2);
+
+    matches.push({
+      rodada,
+      local: `Estádio ${i + 1}`,
+      gols_mandante: finalizada ? Math.floor(Math.random() * 5) : 0,
+      gols_visitante: finalizada ? Math.floor(Math.random() * 5) : 0,
+      status: finalizada ? 'finalizada' : 'agendada',
+      data_partida: data.toISOString().split('T')[0],
+    });
   }
 
   return matches;
@@ -143,19 +130,46 @@ function shuffle(values) {
   return copy;
 }
 
-function buildPairings(teamIndexes) {
-  if (teamIndexes.length < 2) return [];
+function buildPairings(teamIndexes, matchLimit = 15) {
+  const matches = [];
+  const played = new Map(teamIndexes.map(t => [t, 0]));
 
-  const ids = shuffle(teamIndexes);
-  const pairings = [];
-
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      pairings.push([ids[i], ids[j]]);
-    }
+  function canPlay(a, b) {
+    return a !== b;
   }
 
-  return shuffle(pairings);
+  while (matches.length < matchLimit) {
+    let bestA = null;
+    let bestB = null;
+
+    let minSum = Infinity;
+
+    for (let i = 0; i < teamIndexes.length; i++) {
+      for (let j = i + 1; j < teamIndexes.length; j++) {
+        const a = teamIndexes[i];
+        const b = teamIndexes[j];
+
+        if (!canPlay(a, b)) continue;
+
+        const score = (played.get(a) || 0) + (played.get(b) || 0);
+
+        if (score < minSum) {
+          minSum = score;
+          bestA = a;
+          bestB = b;
+        }
+      }
+    }
+
+    if (bestA === null) break;
+
+    matches.push([bestA, bestB]);
+
+    played.set(bestA, (played.get(bestA) || 0) + 1);
+    played.set(bestB, (played.get(bestB) || 0) + 1);
+  }
+
+  return matches;
 }
 
 function buildGeneratedBundle(championship, teams, matches) {
@@ -166,7 +180,30 @@ function buildGeneratedBundle(championship, teams, matches) {
   };
 }
 
-async function generateSeedBundle(championship, teamCount = 4) {
+function limitMatchesBalanced(pairings, limit = 15) {
+  const teamCount = {};
+
+  const result = [];
+
+  for (const [home, away] of pairings) {
+    const homeCount = teamCount[home] || 0;
+    const awayCount = teamCount[away] || 0;
+
+    // evita um time acumular jogos demais
+    if (homeCount >= 4 || awayCount >= 4) continue;
+
+    result.push([home, away]);
+
+    teamCount[home] = homeCount + 1;
+    teamCount[away] = awayCount + 1;
+
+    if (result.length >= limit) break;
+  }
+
+  return result;
+}
+
+async function generateSeedBundle(championship, teamCount = 10) {
   let teamRows = [];
   let matchRows = [];
 
@@ -184,7 +221,7 @@ async function generateSeedBundle(championship, teamCount = 4) {
     nome: row.nome,
     cidade: row.cidade,
     estadio: row.estadio,
-    cor: row.cor,
+    escudo: row.escudo,
     forca: Number(row.forca) || 0,
     ataque: Number(row.ataque) || 0,
     defesa: Number(row.defesa) || 0,
@@ -192,7 +229,7 @@ async function generateSeedBundle(championship, teamCount = 4) {
     order: index,
   }));
 
-  const pairings = buildPairings(teams.map((_, index) => index));
+  const pairings = limitMatchesBalanced(buildPairings(teams.map((_, index) => index)), 15);
 
   const fallbackPairings = [
     [0, 1],
@@ -203,7 +240,7 @@ async function generateSeedBundle(championship, teamCount = 4) {
     [1, 2],
   ];
 
-  const matches = matchRows.slice(0, 6).map((row, index) => {
+  const matches = matchRows.slice(0, 15).map((row, index) => {
     const pairing = pairings[index] || fallbackPairings[index] || [0, 1];
     const finalizada = row.status === 'finalizada';
 

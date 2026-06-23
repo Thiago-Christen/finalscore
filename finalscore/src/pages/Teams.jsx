@@ -5,31 +5,16 @@ import { listChampionships } from '../services/championshipService';
 import useTeams from "../hooks/useTeam";
 import useChampionships from "../hooks/useChampionship";
 import useForm from "../hooks/useForm";
+import useMessageAndEditing from "../hooks/useMessageAndEditting";
+import {getShieldUrl} from "../utils/getShield";
 
-const COLOR_SET = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#A855F7', '#14B8A6'];
 
 export default function Teams() {
   const [championshipFilter, setChampionshipFilter] = useState('all');
   const {championships,loading: championshipsLoading,error: championshipsError} = useChampionships();
-  const [editing, setEditing] = useState(null);
-  const [message, setMessage] = useState('');
   const {teams,loading,error,reload: loadTeams} = useTeams(championshipFilter);
-  const {
-  form,
-  setForm,
-  handleChange,
-  reset,
-} = useForm({
-  campeonato_id: '',
-  nome: '',
-  cidade: '',
-  estadio:'',
-  cor: COLOR_SET[0],
-  forca: 80,
-  ataque: 80,
-  defesa: 80,
-  pontos: 0,
-});
+  const {form,setForm,handleChange,reset,} = useForm({campeonato_id: '',nome: '',cidade: '',estadio:'',escudo:null,forca: 80,ataque: 80,defesa: 80,});
+  const {message,setMessage,editing,setEditing,showMessage,stopEditing} = useMessageAndEditing();
 
   useEffect(() => {
   if (
@@ -56,14 +41,12 @@ export default function Teams() {
     nome: '',
     cidade: '',
     estadio:'',
-    cor: COLOR_SET[0],
     forca: 80,
     ataque: 80,
     defesa: 80,
-    pontos: 0,
   });
 
-  setEditing(null);
+  stopEditing();
 }
 
   async function handleSubmit(event) {
@@ -71,56 +54,67 @@ export default function Teams() {
 
     console.log("FORM ENVIADO:", form);
 
-    setMessage('');
+    showMessage('');
 
     try {
-      const payload = {
-        ...form,
-        campeonato_id: Number(form.campeonato_id),
-        forca: Number(form.forca),
-        ataque: Number(form.ataque),
-        defesa: Number(form.defesa),
-        pontos: Number(form.pontos),
-      };
+      const payload = new FormData();
+
+      payload.append('campeonato_id', form.campeonato_id);
+      payload.append('nome', form.nome);
+      payload.append('cidade', form.cidade);
+      payload.append('estadio', form.estadio);
+      payload.append('forca', form.forca);
+      payload.append('ataque', form.ataque);
+      payload.append('defesa', form.defesa);
+
+      if (form.escudo instanceof File) {
+        payload.append("escudo", form.escudo);
+      }
 
       if (editing) {
         await updateTeam(editing.id, payload);
-        setMessage('Time atualizado com sucesso.');
+        showMessage('Time atualizado com sucesso.');
       } else {
         await addTeam(payload);
-        setMessage('Time criado com sucesso.');
+        showMessage('Time criado com sucesso.');
       }
 
       clearForm();
       await loadTeams(championshipFilter);
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar o time.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar o time.');
     }
+
+    window.scrollTo({
+      top: 14,
+      behavior: 'smooth',
+    });
   }
 
   async function handleRemove(id) {
     try {
       await deleteTeam(id);
-      setMessage('Time excluído.');
+      showMessage('Time excluído.');
       await loadTeams(championshipFilter);
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir o time.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir o time.');
     }
   }
 
   function handleEdit(team) {
     setEditing(team);
     setForm({
-      campeonato_id: String(team.campeonato_id),
-      nome: team.nome,
-      cidade: team.cidade,
-      estadio: team.estadio,
-      cor: team.cor,
-      forca: team.forca,
-      ataque: team.ataque,
-      defesa: team.defesa,
-      pontos: team.pontos,
+        campeonato_id: String(team.campeonato_id),
+        nome: team.nome,
+        cidade: team.cidade,
+        estadio: team.estadio,
+        forca: team.forca,
+        ataque: team.ataque,
+        defesa: team.defesa,
+
+        escudo: team.escudo || null,
     });
+
 
     window.scrollTo({
       top: 14,
@@ -153,11 +147,15 @@ export default function Teams() {
         </div>
 
         {error && (
-          <div className="toast" style={{ marginTop: '16px' }}>
+          <div className="toast error" style={{ marginTop: '16px' }}>
             {error}
           </div>
         )}
-        {message ? <div className="toast" style={{ marginTop: '16px' }}>{message}</div> : null}
+        {message && (
+          <div className="toast success" style={{ marginTop: '16px' }}>
+            {message}
+          </div>
+        )}
 
         <form className="form-card" onSubmit={handleSubmit}>
           <div className="form-grid two-cols">
@@ -167,7 +165,6 @@ export default function Teams() {
                 name="campeonato_id"
                 value={form.campeonato_id}
                 onChange={handleChange}
-                required
               >
                 <option value="">Selecione</option>
                 {championships.map((championship) => (
@@ -182,19 +179,17 @@ export default function Teams() {
                 name="nome"
                 value={form.nome}
                 onChange={handleChange}
-                required
               />
             </label>
           </div>
 
-          <div className="form-grid four-cols">
+          <div className="form-grid tree-cols">
             <label className="field">
               Cidade
               <input
                 name="cidade"
                 value={form.cidade}
                 onChange={handleChange}
-                required
               />
             </label>
             <label className="field">
@@ -203,9 +198,41 @@ export default function Teams() {
                 name="estadio"
                 value={form.estadio}
                 onChange={handleChange}
-                required
               />
             </label>
+            Escudo
+            <label className="upload-dropzone">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    escudo: e.target.files[0],
+                  }))
+                }
+              />
+              {form.escudo ? (
+                <>
+                  <img
+                    src={getShieldUrl(form.escudo)}
+                    alt="Prévia do escudo"
+                    className="shield-preview"
+                  />
+
+                  <strong>{form.escudo.name}</strong>
+                  <p>Clique para trocar a imagem</p>
+                </>
+              ) : (
+                <>
+                  <strong>Clique para enviar um escudo</strong>
+                  <p>PNG, JPG ou SVG</p>
+                </>
+              )}
+            </label>
+          </div>
+
+          <div className="form-grid four-cols">
             <label className="field">
               Força
               <input
@@ -228,9 +255,6 @@ export default function Teams() {
                 onChange={handleChange}
               />
             </label>
-          </div>
-
-          <div className="form-grid three-cols">
             <label className="field">
               Defesa
               <input
@@ -241,33 +265,6 @@ export default function Teams() {
                 value={form.defesa}
                 onChange={handleChange}
               />
-            </label>
-
-            <label className="field">
-              Pontos
-              <input
-                type="number"
-                min="0"
-                name="pontos"
-                value={form.pontos}
-                onChange={handleChange}
-              />
-            </label>
-
-            <label className="field">
-              Cor
-              <div className="swatches compact">
-                {COLOR_SET.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`swatch ${form.cor === color ? 'active' : ''}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setForm((current) => ({ ...current, cor: color }))}
-                    aria-label={`Selecionar cor ${color}`}
-                  />
-                ))}
-              </div>
             </label>
           </div>
 

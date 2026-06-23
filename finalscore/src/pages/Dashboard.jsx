@@ -145,7 +145,14 @@ export default function Dashboard() {
           <div className="stack">
             {data.standings.map((team, index) => (
               <article key={team.id} className="toast">
-                <strong>{index + 1}. {team.nome}</strong>
+                <img
+                  src={team.escudo}
+                  alt={team.nome}
+                  width={32}
+                  height={32}
+                  style={{display: 'flex',marginRight: '8px', objectFit: 'contain', filter: team.escudo ? 'none' : 'grayscale(100%)' }}
+                />
+                <strong>{team.nome}</strong>
                 <p>
                   {team.pontos} pts • {team.jogos} jogos • SG {team.saldo_gols} • GP {team.gols_pro} • GC {team.gols_contra}
                 </p>

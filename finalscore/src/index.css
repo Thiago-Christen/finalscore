@@ -99,7 +99,6 @@ button, input, select, textarea { font: inherit; }
 .panel, .mini-list, .form-card, .auth-card, .auth-copy { padding: 18px; }
 .team-card, .match-card { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
 .team-row { display: grid; gap: 10px; }
-.team-badge, .dot { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255,255,255,0.06); }
 .team-meta { display: grid; justify-items: end; gap: 3px; color: var(--muted); }
 .badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; }
 .badge.accent { color: #dff7ff; border-color: rgba(67, 196, 255, 0.35); background: rgba(67, 196, 255, 0.12); }
@@ -168,8 +167,7 @@ select option {
 .auth-card { display: grid; gap: 14px; }
 .auth-footer { margin: 0; }
 .auth-footer a { color: #8ad8ff; }
-.toast { padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); }
-.toast.error { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.12); }
+.toast { padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.19); }
 .empty-state { display: grid; gap: 12px; justify-items: start; }
 .feature-list { margin: 0; padding-left: 18px; display: grid; gap: 10px; }
 
@@ -196,6 +194,65 @@ select option {
   background: #fef3c7;
   color: #92400e;
   border: 1px solid #fde68a;
+}
+
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 180px;
+  padding: 20px;
+
+  border: 2px dashed #334155;
+  border-radius: 12px;
+
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.upload-dropzone:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.upload-dropzone input {
+  display: none;
+}
+
+.upload-dropzone strong {
+  margin-top: 10px;
+}
+
+.upload-dropzone p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.shield-preview {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.teams-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vs {
+  font-weight: bold;
+  opacity: 0.6;
 }
 
 @media (max-width: 960px) {

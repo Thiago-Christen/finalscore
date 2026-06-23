@@ -3,14 +3,14 @@ import useChampionships from '../hooks/useChampionship';
 import { useSearchParams } from 'react-router-dom';
 import { addChampionship, deleteChampionship, generateSeedForChampionship, updateChampionship } from '../services/championshipService';
 import useForm from "../hooks/useForm";
+import useMessageAndEditing from '../hooks/useMessageAndEditting';
 
 export default function Championships() {
   const [searchParams, setSearchParams] = useSearchParams();
   const seedFromQuery = searchParams.get('seed') === '1';
   const {form,setForm,handleChange,reset} = useForm({nome: '',descricao: '',generateSeed: seedFromQuery,});
-  const [editing, setEditing] = useState(null);
-  const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const {message,showMessage,editing,setEditing,stopEditing} = useMessageAndEditing();
 
   const {championships,loading,error,reload: loadChampionships} = useChampionships();
 
@@ -26,12 +26,12 @@ export default function Championships() {
     generateSeed: seedFromQuery,
   });
 
-  setEditing(null);
+  stopEditing();
 }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setMessage('');
+    showMessage('');
     setSaving(true);
 
     try {
@@ -40,7 +40,7 @@ export default function Championships() {
           nome: form.nome,
           descricao: form.descricao,
         });
-        setMessage('Campeonato atualizado com sucesso.');
+        showMessage('Campeonato atualizado com sucesso.');
       } else {
         const created = await addChampionship({
           nome: form.nome,
@@ -49,13 +49,13 @@ export default function Championships() {
         });
 
         if (form.generateSeed) {
-          setMessage('Campeonato criado e populado com dados aleatórios.');
+          showMessage('Campeonato criado e populado com dados aleatórios.');
         } else {
-          setMessage('Campeonato criado sem seed inicial.');
+          showMessage('Campeonato criado sem seed inicial.');
         }
 
         if (created?.gerado) {
-          setMessage('Campeonato criado.');
+          showMessage('Campeonato criado.');
         }
       }
 
@@ -63,7 +63,7 @@ export default function Championships() {
       await loadChampionships();
       setSearchParams({});
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar o campeonato.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível salvar o campeonato.');
     } finally {
       setSaving(false);
     }
@@ -72,20 +72,20 @@ export default function Championships() {
   async function handleRemove(id) {
     try {
       await deleteChampionship(id);
-      setMessage('Campeonato removido.');
+      showMessage('Campeonato removido.');
       await loadChampionships();
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir o campeonato.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível excluir o campeonato.');
     }
   }
 
   async function handleSeed(id) {
     try {
       await generateSeedForChampionship(id);
-      setMessage('Seed gerado e salvo no banco.');
+      showMessage('Seed gerado e salvo no banco.');
       await loadChampionships();
     } catch (err) {
-      setMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível gerar o seed.');
+      showMessage(err?.response?.data?.mensagem || err.message || 'Não foi possível gerar o seed.');
     }
   }
 
@@ -116,7 +116,7 @@ export default function Championships() {
                 value={form.nome}
                 onChange={handleChange}
                 placeholder="Ex.: FinalScore Cup 2026"
-                required
+                
               />
             </label>
             <label className="field">
@@ -126,7 +126,7 @@ export default function Championships() {
                 value={form.descricao}
                 onChange={handleChange}
                 placeholder="Ex.: Temporada principal"
-                required
+                
               />
             </label>
           </div>

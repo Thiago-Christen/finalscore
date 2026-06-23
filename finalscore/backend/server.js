@@ -3,6 +3,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
+const multer = require('multer');
+const path = require('path');
 
 const pool = require('./db');
 const { generateSeedBundle } = require('./TheSports');
@@ -13,7 +15,45 @@ const JWT_SECRET = process.env.JWT_SECRET || 'finalscore-secret';
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 10);
 
 app.use(cors());
+app.use('/uploads', express.static('uploads'));
 app.use(express.json());
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueName =
+      Date.now() + '-' + Math.round(Math.random() * 1e9);
+
+    cb(
+      null,
+      uniqueName + path.extname(file.originalname)
+    );
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/svg+xml',
+      'image/webp',
+    ];
+
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Formato inválido.'));
+    }
+  },
+});
 
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -70,16 +110,16 @@ function buildResult(golsMandante, golsVisitante) {
 
 function calculateStandings(teams, matches) {
   const standings = teams.map((team) => ({
-    ...team,
-    jogos: 0,
-    vitorias: 0,
-    empates: 0,
-    derrotas: 0,
-    gols_pro: 0,
-    gols_contra: 0,
-    saldo_gols: 0,
-    pontos: Number(team.pontos) || 0,
-  }));
+  ...team,
+  jogos: 0,
+  vitorias: 0,
+  empates: 0,
+  derrotas: 0,
+  gols_pro: 0,
+  gols_contra: 0,
+  saldo_gols: 0,
+  pontos: 0,
+}));
 
   const byId = new Map(standings.map((team) => [team.id, team]));
 
@@ -163,11 +203,10 @@ const SCHEMA_STATEMENTS = [
     nome VARCHAR(100) NOT NULL,
     cidade VARCHAR(100) NOT NULL,
     estadio VARCHAR(150) NOT NULL,
-    cor VARCHAR(50) NOT NULL,
+    escudo VARCHAR(500),
     forca INT DEFAULT 0,
     ataque INT DEFAULT 0,
     defesa INT DEFAULT 0,
-    pontos INT DEFAULT 0,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_times_campeonato
       FOREIGN KEY (campeonato_id) REFERENCES campeonato(id)
@@ -301,12 +340,20 @@ async function getChampionshipBundle(userId, championshipIdParam) {
   );
 
   const [matchRows] = await pool.query(
-    `SELECT p.*
-       FROM partidas p
-       INNER JOIN campeonato c ON c.id = p.campeonato_id
+     `
+      SELECT 
+        p.*,
+        tm.escudo AS time_mandante_escudo,
+        tv.escudo AS time_visitante_escudo
+
+      FROM partidas p
+      INNER JOIN campeonato c ON c.id = p.campeonato_id
+      LEFT JOIN times tm ON tm.id = p.time_mandante_id
+      LEFT JOIN times tv ON tv.id = p.time_visitante_id
       ${selectedId ? 'WHERE c.usuario_id = ? AND p.campeonato_id = ?' : 'WHERE c.usuario_id = ?'}
-      ORDER BY p.rodada ASC, p.id ASC`,
-    selectedId ? [userId, selectedId] : [userId],
+      ORDER BY p.rodada ASC, p.id ASC
+      `,
+      selectedId ? [userId, selectedId] : [userId],
   );
 
   const teamMap = new Map(teamRows.map((team) => [team.id, team]));
@@ -319,6 +366,8 @@ async function getChampionshipBundle(userId, championshipIdParam) {
     time_visitante_id: match.time_visitante_id,
     time_mandante_nome: teamMap.get(match.time_mandante_id)?.nome || 'Mandante',
     time_visitante_nome: teamMap.get(match.time_visitante_id)?.nome || 'Visitante',
+    time_mandante_escudo: teamMap.get(match.time_mandante_id)?.escudo || null,
+    time_visitante_escudo: teamMap.get(match.time_visitante_id)?.escudo || null,
     gols_mandante: match.gols_mandante,
     gols_visitante: match.gols_visitante,
     resultado: match.resultado,
@@ -350,7 +399,7 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const { nome, email, senha } = req.body;
 
   if (!nome || !email || !senha) {
-    return res.status(400).json({ mensagem: 'Preencha nome, email e senha.' });
+    return res.status(400).json({mensagem: 'Preencha nome, email e senha.' });
   }
 
   if (nome.trim().length < 3) {
@@ -392,7 +441,7 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const token = signToken(user);
 
   return res.status(201).json({
-    mensagem: 'Usuário criado com sucesso.',
+    mensagem: 'Usuário criado com successo.',
     token,
     usuario: user,
   });
@@ -442,7 +491,7 @@ app.post('/api/championships', authRequired, asyncHandler(async (req, res) => {
   const { nome, descricao, generateSeed } = req.body;
 
   if (!nome || !descricao) {
-    return res.status(400).json({ mensagem: 'Preencha nome e descrição.' });
+    return res.status(400).json({success: false, mensagem: 'Preencha nome e descrição.' });
   }
 
   const [result] = await pool.query(
@@ -474,12 +523,12 @@ app.put('/api/championships/:id', authRequired, asyncHandler(async (req, res) =>
   const { nome, descricao } = req.body;
 
   if (!championshipId) {
-    return res.status(400).json({ mensagem: 'Campeonato inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Campeonato inválido.' });
   }
 
   const owns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   await pool.query(
@@ -487,33 +536,33 @@ app.put('/api/championships/:id', authRequired, asyncHandler(async (req, res) =>
     [nome.trim(), descricao.trim(), championshipId, req.user.id],
   );
 
-  res.json({ mensagem: 'Campeonato atualizado.' });
+  res.json({ success: true, mensagem: 'Campeonato atualizado.' });
 }));
 
 app.delete('/api/championships/:id', authRequired, asyncHandler(async (req, res) => {
   const championshipId = normalizeId(req.params.id);
   if (!championshipId) {
-    return res.status(400).json({ mensagem: 'Campeonato inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Campeonato inválido.' });
   }
 
   const owns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   await pool.query('DELETE FROM campeonato WHERE id = ? AND usuario_id = ?', [championshipId, req.user.id]);
-  res.json({ mensagem: 'Campeonato excluído.' });
+  res.json({ success: true, mensagem: 'Campeonato excluído.' });
 }));
 
 app.post('/api/championships/:id/seed', authRequired, asyncHandler(async (req, res) => {
   const championshipId = normalizeId(req.params.id);
   if (!championshipId) {
-    return res.status(400).json({ mensagem: 'Campeonato inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Campeonato inválido.' });
   }
 
   const owns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   const generated = await seedChampionship(championshipId, req.user.id);
@@ -540,33 +589,36 @@ app.get('/api/teams', authRequired, asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
-app.post('/api/teams', authRequired, asyncHandler(async (req, res) => {
+app.post('/api/teams', authRequired, upload.single('escudo'), asyncHandler(async (req, res) => {
   const {
     campeonato_id,
     nome,
     cidade,
     estadio,
-    cor,
     forca = 0,
     ataque = 0,
     defesa = 0,
-    pontos = 0,
   } = req.body;
 
   const championshipId = normalizeId(campeonato_id);
-  if (!championshipId || !nome || !cidade || !cor) {
-    return res.status(400).json({ mensagem: 'Preencha os campos obrigatórios do time.' });
+  if (!championshipId || !nome || !cidade || !estadio) {
+    return res.status(400).json({ success: false, mensagem: 'Preencha os campos obrigatórios do time.' });
   }
 
   const owns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
+  const escudoFile = req.file ? `/uploads/${req.file.filename}` : null;
+  const escudoUrl = req.body.escudo || null;
+
+  const escudoFinal = escudoFile || escudoUrl || null;
+
   const [result] = await pool.query(
-    `INSERT INTO times (campeonato_id, nome, cidade, estadio ,cor, forca, ataque, defesa, pontos)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [championshipId, nome.trim(), cidade.trim(), estadio?.trim() || '',cor, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0, Number(pontos) || 0],
+    `INSERT INTO times (campeonato_id, nome, cidade, estadio, escudo, forca, ataque, defesa)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [championshipId, nome.trim(), cidade.trim(), estadio?.trim() || '',escudoFinal, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0],
     
   );
 
@@ -575,70 +627,79 @@ app.post('/api/teams', authRequired, asyncHandler(async (req, res) => {
     campeonato_id: championshipId,
     nome: nome.trim(),
     cidade: cidade.trim(),
-    cor,
+    estadio: estadio?.trim() || '',
+    escudo: escudoFinal,
     forca: Number(forca) || 0,
     ataque: Number(ataque) || 0,
     defesa: Number(defesa) || 0,
-    pontos: Number(pontos) || 0,
   });
 }));
 
-app.put('/api/teams/:id', authRequired, asyncHandler(async (req, res) => {
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message) {
+    return res.status(400).json({ success: false, mensagem: err.message });
+  }
+  res.status(500).json({ success: false, mensagem: 'Erro interno do servidor.' });
+
+});
+
+app.put('/api/teams/:id', authRequired, upload.single('escudo'), asyncHandler(async (req, res) => {
   const teamId = normalizeId(req.params.id);
   const {
     campeonato_id,
     nome,
     cidade,
     estadio,
-    cor,
     forca = 0,
     ataque = 0,
     defesa = 0,
-    pontos = 0,
   } = req.body;
+  const escudoFile = req.file ? `/uploads/${req.file.filename}` : null;
+  const escudoUrl = req.body.escudo || null;
+  const escudoFinal = escudoFile || escudoUrl || null;
 
   if (!teamId) {
-    return res.status(400).json({ mensagem: 'Time inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Time inválido.' });
   }
 
   const owns = await assertTeamOwnership(teamId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Time não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Time não encontrado.' });
   }
 
   const championshipId = normalizeId(campeonato_id);
   if (!championshipId) {
-    return res.status(400).json({ mensagem: 'Campeonato inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Campeonato inválido.' });
   }
 
   const championshipOwns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!championshipOwns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   await pool.query(
     `UPDATE times
-        SET campeonato_id = ?, nome = ?, cidade = ?, estadio = ? ,cor = ?, forca = ?, ataque = ?, defesa = ?, pontos = ?
+        SET campeonato_id = ?, nome = ?, cidade = ?, estadio = ? ,escudo = ?, forca = ?, ataque = ?, defesa = ?
       WHERE id = ?`,
-    [championshipId, nome.trim(), cidade.trim(), cor, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0, Number(pontos) || 0, teamId],
+    [championshipId, nome.trim(), cidade.trim(), estadio?.trim() || '', escudoFinal, Number(forca) || 0, Number(ataque) || 0, Number(defesa) || 0,   teamId],
   );
 
-  res.json({ mensagem: 'Time atualizado.' });
+  res.json({ success: true, mensagem: 'Time atualizado.' });
 }));
 
 app.delete('/api/teams/:id', authRequired, asyncHandler(async (req, res) => {
   const teamId = normalizeId(req.params.id);
   if (!teamId) {
-    return res.status(400).json({ mensagem: 'Time inválido.' });
+    return res.status(400).json({ success: false, mensagem: 'Time inválido.' });
   }
 
   const owns = await assertTeamOwnership(teamId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Time não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Time não encontrado.' });
   }
 
   await pool.query('DELETE FROM times WHERE id = ?', [teamId]);
-  res.json({ mensagem: 'Time excluído.' });
+  res.json({ success: true, mensagem: 'Time excluído.' });
 }));
 
 app.get('/api/matches', authRequired, asyncHandler(async (req, res) => {
@@ -646,10 +707,13 @@ app.get('/api/matches', authRequired, asyncHandler(async (req, res) => {
 
   let sql = `
     SELECT p.id, p.campeonato_id, p.rodada, p.local, p.time_mandante_id, p.time_visitante_id,
-           p.gols_mandante, p.gols_visitante, p.resultado, p.status, p.data_partida,
-           p.criado_em, p.atualizado_em,
-           tm.nome AS time_mandante_nome,
-           tv.nome AS time_visitante_nome
+          p.gols_mandante, p.gols_visitante, p.resultado, p.status, p.data_partida,
+          p.criado_em, p.atualizado_em,
+          tm.nome AS time_mandante_nome,
+          tm.escudo AS time_mandante_escudo,
+
+          tv.nome AS time_visitante_nome,
+          tv.escudo AS time_visitante_escudo
       FROM partidas p
       INNER JOIN campeonato c ON c.id = p.campeonato_id
       LEFT JOIN times tm ON tm.id = p.time_mandante_id
@@ -687,17 +751,18 @@ app.post('/api/matches', authRequired, asyncHandler(async (req, res) => {
 
   if (homeId === awayId) {
   return res.status(400).json({
+    success: false,
     mensagem: 'O time mandante e visitante não podem ser iguais.'
   });
 }
 
   if (!championshipId || !homeId || !awayId || !rodada || !local) {
-    return res.status(400).json({ mensagem: 'Preencha os campos obrigatórios da partida.' });
+    return res.status(400).json({ success: false, mensagem: 'Preencha os campos obrigatórios da partida.' });
   }
 
   const owns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   const [teamCheck] = await pool.query(
@@ -709,7 +774,7 @@ app.post('/api/matches', authRequired, asyncHandler(async (req, res) => {
   );
 
   if (teamCheck.length < 2) {
-    return res.status(400).json({ mensagem: 'Os times precisam pertencer ao mesmo campeonato.' });
+    return res.status(400).json({ success: false, mensagem: 'Os times precisam pertencer ao mesmo campeonato.' });
   }
 
   const finalizada = String(status) === 'finalizada';
@@ -763,12 +828,12 @@ app.put('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
   } = req.body;
 
   if (!matchId) {
-    return res.status(400).json({ mensagem: 'Partida inválida.' });
+    return res.status(400).json({ success: false, mensagem: 'Partida inválida.' });
   }
 
   const owns = await assertMatchOwnership(matchId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Partida não encontrada.' });
+    return res.status(404).json({ success: false, mensagem: 'Partida não encontrada.' });
   }
 
   const championshipId = normalizeId(campeonato_id);
@@ -777,17 +842,18 @@ app.put('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
 
   if (homeId === awayId) {
   return res.status(400).json({
+    success: false,
     mensagem: 'O time mandante e visitante não podem ser iguais.'
   });
 }
 
   if (!championshipId || !homeId || !awayId) {
-    return res.status(400).json({ mensagem: 'Campos inválidos.' });
+    return res.status(400).json({ success: false, mensagem: 'Campos inválidos.' });
   }
 
   const championshipOwns = await assertChampionshipOwnership(championshipId, req.user.id);
   if (!championshipOwns) {
-    return res.status(404).json({ mensagem: 'Campeonato não encontrado.' });
+    return res.status(404).json({ success: false, mensagem: 'Campeonato não encontrado.' });
   }
 
   const [teamCheck] = await pool.query(
@@ -799,7 +865,7 @@ app.put('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
   );
 
   if (teamCheck.length < 2) {
-    return res.status(400).json({ mensagem: 'Os times precisam pertencer ao mesmo campeonato.' });
+    return res.status(400).json({ success: false, mensagem: 'Os times precisam pertencer ao mesmo campeonato.' });
   }
 
   const finalizada = String(status) === 'finalizada';
@@ -824,22 +890,22 @@ app.put('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
     ],
   );
 
-  res.json({ mensagem: 'Partida atualizada.' });
+  res.json({ success: true, mensagem: 'Partida atualizada.' });
 }));
 
 app.delete('/api/matches/:id', authRequired, asyncHandler(async (req, res) => {
   const matchId = normalizeId(req.params.id);
   if (!matchId) {
-    return res.status(400).json({ mensagem: 'Partida inválida.' });
+    return res.status(400).json({ success: false, mensagem: 'Partida inválida.' });
   }
 
   const owns = await assertMatchOwnership(matchId, req.user.id);
   if (!owns) {
-    return res.status(404).json({ mensagem: 'Partida não encontrada.' });
+    return res.status(404).json({ success: false, mensagem: 'Partida não encontrada.' });
   }
 
   await pool.query('DELETE FROM partidas WHERE id = ?', [matchId]);
-  res.json({ mensagem: 'Partida excluída.' });
+  res.json({ success: true, mensagem: 'Partida excluída.' });
 }));
 
 app.get('/api/dashboard/summary', authRequired, asyncHandler(async (req, res) => {
@@ -860,14 +926,14 @@ async function seedChampionship(championshipId, userId) {
   const championshipRows = await pool.query('SELECT id, nome, descricao FROM campeonato WHERE id = ? LIMIT 1', [championshipId]);
   const championship = championshipRows[0][0];
 
-  const generated = await generateSeedBundle(championship, 4);
+  const generated = await generateSeedBundle(championship, 10);
 
   const teamIds = [];
   for (const team of generated.times) {
     const [result] = await pool.query(
-      `INSERT INTO times (campeonato_id, nome, cidade, estadio ,cor, forca, ataque, defesa, pontos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [championshipId, team.nome, team.cidade, team.estadio ,team.cor, team.forca, team.ataque, team.defesa, team.points || 0],
+      `INSERT INTO times (campeonato_id, nome, cidade, estadio ,escudo,forca, ataque, defesa)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [championshipId, team.nome, team.cidade, team.estadio ,team.escudo, team.forca, team.ataque, team.defesa],
     );
     teamIds.push(result.insertId);
   }
@@ -923,24 +989,24 @@ async function seedChampionship(championshipId, userId) {
       campeonato_id: championshipId,
       nome: team.nome,
       cidade: team.cidade,
-      cor: team.cor,
+      estadio: team.estadio,
+      escudo: team.escudo,
       forca: team.forca,
       ataque: team.ataque,
       defesa: team.defesa,
-      pontos: team.points || 0,
     })),
     partidas: createdMatches,
   };
 }
 
 app.use((err, _req, res, _next) => {
-  console.error('ERRO COMPLETO:');
   console.error(err);
 
-  res.status(500).json({
-    mensagem: 'Erro interno do servidor.',
-    erro: err.message,
-    stack: err.stack,
+  const status = err.status || 500;
+
+  return res.status(status).json({
+    success: false,
+    message: err.message || 'Erro interno do servidor.'
   });
 });
 

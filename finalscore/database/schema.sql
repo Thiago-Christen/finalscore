@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS times (
   campeonato_id INT NOT NULL,
   nome VARCHAR(100) NOT NULL,
   cidade VARCHAR(100) NOT NULL,
+  estadio VARCHAR(150) NOT NULL,
+  escudo VARCHAR(500),
   cor VARCHAR(50) NOT NULL,
   forca INT DEFAULT 0,
   ataque INT DEFAULT 0,
